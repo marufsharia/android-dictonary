@@ -1,16 +1,20 @@
 package me.marufsharia.dictonary;
 
+import android.content.ActivityNotFoundException;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.res.AssetManager;
 import android.database.Cursor;
 import android.database.SQLException;
 import android.os.Bundle;
+import android.speech.RecognizerIntent;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.ImageButton;
 import android.widget.RelativeLayout;
-
+import android.widget.Toast;
 
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
@@ -21,11 +25,21 @@ import androidx.cursoradapter.widget.SimpleCursorAdapter;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.List;
+import java.util.Locale;
 
 public class MainActivity extends AppCompatActivity {
 
+    private String DB_PATH = null;
+    private static String DB_NAME = "eng_dictionary.db";
+
+    private static final String TAG = "MainActivity";
     SearchView search;
     static DatabaseHelper databaseHelper;
     static boolean databaseOpenned = false;
@@ -40,6 +54,8 @@ public class MainActivity extends AppCompatActivity {
     RelativeLayout emptyHistory;
     Cursor cursorHistory;
 
+    ImageButton btnMic;
+    private final int REQ_CODE_SPEECH_INPUT = 100;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -50,28 +66,43 @@ public class MainActivity extends AppCompatActivity {
         Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
 
+        btnMic = findViewById(R.id.btnMic);
         search = findViewById(R.id.search_view);
+        search.setIconifiedByDefault(false);
 
         search.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-
                 search.setIconified(false);
-
-
             }
         });
 
+        btnMic.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+                intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                        RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+                intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault());
+                intent.putExtra(RecognizerIntent.EXTRA_PROMPT,
+                        getString(R.string.speech_prompt));
+                try {
+                    startActivityForResult(intent, REQ_CODE_SPEECH_INPUT);
+                } catch (ActivityNotFoundException a) {
+                    Toast.makeText(getApplicationContext(),
+                            getString(R.string.speech_not_supported),
+                            Toast.LENGTH_SHORT).show();
+                }
+            }
+        });
 
         databaseHelper = new DatabaseHelper(this);
-
         if (databaseHelper.checkDatabase()) {
             openDatabase();
-        } else {
-
+        }
+        else {
             LoadDatabaseAsync loadDatabaseAsync = new LoadDatabaseAsync(MainActivity.this);
             loadDatabaseAsync.execute();
-
         }
 
         final String[] from = new String[]{"en_word"};
@@ -89,7 +120,6 @@ public class MainActivity extends AppCompatActivity {
 
 
         search.setSuggestionsAdapter(simpleCursorAdapter);
-
         search.setOnSuggestionListener(new SearchView.OnSuggestionListener() {
             @Override
             public boolean onSuggestionClick(int position) {
@@ -149,7 +179,14 @@ public class MainActivity extends AppCompatActivity {
                                 });
 
                         String negativeText = getString(android.R.string.cancel);
-                        builder.setNegativeButton(negativeText,
+                        builder.setPositiveButton(positiveText, new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialogInterface, int i) {
+                                search.setFocusable(true);
+                                search.setIconified(false);
+                                search.requestFocusFromTouch();
+                            }
+                        }).setNegativeButton(negativeText,
                                 new DialogInterface.OnClickListener() {
                                     @Override
                                     public void onClick(DialogInterface dialog, int which) {
@@ -160,6 +197,7 @@ public class MainActivity extends AppCompatActivity {
                         AlertDialog dialog = builder.create();
                         // display dialog
                         dialog.show();
+
                     }
 
                     else
@@ -184,14 +222,11 @@ public class MainActivity extends AppCompatActivity {
 
 
             @Override
-            public boolean onQueryTextChange(final String s) {
-
+            public boolean onQueryTextChange(String s) {
                 search.setIconifiedByDefault(false); //Give Suggestion list margins
                 if(s.length()>0){
-                    //Log.d("test",s);
                     try {
                         Cursor cursorSuggestion=databaseHelper.getSuggestions(s);
-                        //Log.d("test",String.valueOf(cursorSuggestion.getCount()));
                         if (cursorSuggestion.getCount() > 0) {
                             simpleCursorAdapter.changeCursor(cursorSuggestion);
                         }
@@ -208,10 +243,10 @@ public class MainActivity extends AppCompatActivity {
         });
 
 
-        emptyHistory = (RelativeLayout) findViewById(R.id.empty_history);
+        emptyHistory = findViewById(R.id.empty_history);
 
         //recycler View
-        recyclerView = (RecyclerView)findViewById(R.id.recycler_view_history);
+        recyclerView = findViewById(R.id.recycler_view_history);
         layoutManager = new LinearLayoutManager(MainActivity.this);
 
         recyclerView.setLayoutManager(layoutManager);
@@ -256,6 +291,7 @@ public class MainActivity extends AppCompatActivity {
 
     public static void openDatabase() {
         try {
+            databaseHelper.close();
             databaseHelper.openDatabase();
             databaseOpenned = true;
 
@@ -302,5 +338,64 @@ public class MainActivity extends AppCompatActivity {
     protected void onRestart() {
         super.onRestart();
         fetch_history();
+    }
+
+    private void copyAssets() {
+        AssetManager assetManager = getAssets();
+        String[] files = null;
+        try {
+            files = assetManager.list("");
+        } catch (IOException e) {
+            Log.e("tag", "Failed to get asset file list.", e);
+        }
+        for(String filename : files) {
+            InputStream in = null;
+            OutputStream out = null;
+           String DB_NAME = "eng_dictionary.db";
+            String DB_PATH = "/data/data/" + getApplicationContext().getPackageName() + "/" + "databases/";
+            try {
+                in = assetManager.open(filename);
+                //File outFile = new File(getExternalFilesDir(null), filename);
+                //File outFile = new File(getExternalFilesDir(null), "/data/data/");
+                String outFileName = DB_PATH + DB_NAME;
+                 out = new FileOutputStream(outFileName);
+                copyFile(in, out);
+                in.close();
+                in = null;
+                out.flush();
+                out.close();
+                out = null;
+            } catch(IOException e) {
+                Log.e("tag", "Failed to copy asset file: " + filename, e);
+            }
+        }
+    }
+    private void copyFile(InputStream in, OutputStream out) throws IOException {
+        byte[] buffer = new byte[1024];
+        int read;
+        while((read = in.read(buffer)) != -1){
+            out.write(buffer, 0, read);
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode,
+                                    Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+
+        switch (requestCode) {
+            case REQ_CODE_SPEECH_INPUT: {
+                if (resultCode == RESULT_OK && null != data) {
+
+                    ArrayList<String> result = data
+                            .getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
+                    search.setQuery(result.get(0) ,true);
+                    search.clearFocus();
+                }
+                break;
+            }
+
+        }
+
     }
 }

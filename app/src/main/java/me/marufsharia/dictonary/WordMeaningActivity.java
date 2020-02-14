@@ -8,8 +8,8 @@ import android.util.Log;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.ImageButton;
+import android.widget.Toast;
 
-import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 import androidx.fragment.app.Fragment;
@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
+import me.marufsharia.dictonary.MSUtility.Utility;
 import me.marufsharia.dictonary.fragments.FragmentAntonyms;
 import me.marufsharia.dictonary.fragments.FragmentExample;
 import me.marufsharia.dictonary.fragments.FragmentsDefinition;
@@ -51,7 +52,7 @@ public class WordMeaningActivity extends AppCompatActivity {
 
         //received values
         Bundle bundle = getIntent().getExtras();
-        enWord= bundle.getString("en_word");
+        enWord = bundle.getString("en_word");
 
 
         myDbHelper = new DatabaseHelper(this);
@@ -67,18 +68,17 @@ public class WordMeaningActivity extends AppCompatActivity {
 
         if (c.moveToFirst()) {
 
-            enDefinition= c.getString(c.getColumnIndex("en_definition"));
-            example=c.getString(c.getColumnIndex("example"));
-            synonyms=c.getString(c.getColumnIndex("synonyms"));
-            antonyms=c.getString(c.getColumnIndex("antonyms"));
+            enDefinition = c.getString(c.getColumnIndex("en_definition"));
+            example = c.getString(c.getColumnIndex("example"));
+            synonyms = c.getString(c.getColumnIndex("synonyms"));
+            antonyms = c.getString(c.getColumnIndex("antonyms"));
 
         }
 
         myDbHelper.inserHistory(enWord);
 
 
-        ImageButton btnSpeak = (ImageButton) findViewById(R.id.btnSpeak);
-
+        ImageButton btnSpeak = findViewById(R.id.btnSpeak);
         btnSpeak.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -86,21 +86,44 @@ public class WordMeaningActivity extends AppCompatActivity {
                     @Override
                     public void onInit(int status) {
                         // TODO Auto-generated method stub
-                        if(status == TextToSpeech.SUCCESS){
-                            int result=tts.setLanguage(Locale.getDefault());
-                            if(result==TextToSpeech.LANG_MISSING_DATA || result==TextToSpeech.LANG_NOT_SUPPORTED){
+                        if (status == TextToSpeech.SUCCESS) {
+                            int result = tts.setLanguage(Locale.getDefault());
+                            if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
                                 Log.e("error", "This Language is not supported");
-                            }
-                            else{
+                            } else {
                                 tts.speak(enWord, TextToSpeech.QUEUE_FLUSH, null);
                             }
-                        }
-                        else
+                        } else
                             Log.e("error", "Initialization Failed!");
                     }
                 });
             }
         });
+//        btnSpeak.setOnLongClickListener(new View.OnLongClickListener() {
+//            @Override
+//            public boolean onLongClick(View view) {
+//                tts = new TextToSpeech(WordMeaningActivity.this, new TextToSpeech.OnInitListener() {
+//                    @Override
+//                    public void onInit(int status) {
+//                        // TODO Auto-generated method stub
+//                        if (status == TextToSpeech.SUCCESS) {
+//                            int result = tts.setLanguage(Locale.getDefault());
+//                            if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
+//                                Log.e("error", "This Language is not supported");
+//                            } else {
+//                                tts.speak(enWord+" definition. "+ enDefinition, TextToSpeech.QUEUE_FLUSH, null);
+//                            }
+//                        }
+//                        else{
+//                            Log.e("error", "Initialization Failed!");
+//                        }
+//
+//
+//                    }
+//                });
+//                return false;
+//            }
+//        });
 
 
         Toolbar toolbar = findViewById(R.id.mToolbar);
@@ -123,6 +146,8 @@ public class WordMeaningActivity extends AppCompatActivity {
             @Override
             public void onTabSelected(TabLayout.Tab tab) {
                 viewPager.setCurrentItem(tab.getPosition());
+
+
             }
 
             @Override
@@ -132,7 +157,6 @@ public class WordMeaningActivity extends AppCompatActivity {
 
             @Override
             public void onTabReselected(TabLayout.Tab tab) {
-
             }
         });
 

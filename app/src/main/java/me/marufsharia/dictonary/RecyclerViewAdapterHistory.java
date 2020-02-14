@@ -32,8 +32,8 @@ public class RecyclerViewAdapterHistory extends RecyclerView.Adapter<RecyclerVie
 
         public HistoryViewHolder(View v) {
             super(v);
-            enWord = (TextView) v.findViewById(R.id.en_word);
-            enDef = (TextView) v.findViewById(R.id.en_def);
+            enWord = v.findViewById(R.id.en_word);
+            enDef = v.findViewById(R.id.en_def);
 
 
             v.setOnClickListener(new View.OnClickListener() {
